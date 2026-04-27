@@ -1,0 +1,12 @@
+.vscode
+.vs/
+bin/
+
+out/
+pass/build
+*.s
+*.ll
+.claude
+*.exe
+*.pdb
+*.o

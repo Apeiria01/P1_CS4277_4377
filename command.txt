@@ -1,0 +1,4 @@
+.\make-llvm-ir.ps1 .\subject.c subject.ll 
+.\plug.ps1 .\subject.ll .\subject2.ll  
+"D:\llvm-project\b\RelWithDebInfo\bin\llc.exe" -mtriple=x86_64-pc-windows-msvc ./subject2.ll     
+.\compile.ps1 .\subject2.s ./subject2.exe  
