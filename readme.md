@@ -3,8 +3,8 @@ Team member: Yean Luo
 # Project 2 Implementing Stack Canaries in an LLVM IR Pass for Windows x64
 
 ## Implementation Setting
-System: Windows x64
-LLVM: LLVM release package at [https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.4/clang+llvm-22.1.4-x86_64-pc-windows-msvc.tar.xz](https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.4/clang+llvm-22.1.4-x86_64-pc-windows-msvc.tar.xz) for compiling subjects.
+System: Windows x64  
+LLVM: LLVM release package at [https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.4/clang+llvm-22.1.4-x86_64-pc-windows-msvc.tar.xz](https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.4/clang+llvm-22.1.4-x86_64-pc-windows-msvc.tar.xz) for compiling subjects.  
 C/C++ compiler: MSVC vc 145 with Visual Studio 2026 for compiling IR pass plugin.
 
 # Deliverable
