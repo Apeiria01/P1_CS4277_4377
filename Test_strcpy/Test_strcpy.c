@@ -2,6 +2,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <stdlib.h>
+
+
+void hijacked()
+{
+    printf("HIJACKED\n");
+    fflush(stdout);
+    exit(42);
+}
+
 int vulnerable( const char * str )
 {
 	char buffer[12];
@@ -13,10 +23,11 @@ int vulnerable( const char * str )
 
 int main ( int argc, char ** argv )
 {
+	volatile void* keep_hijacked = (void*)&hijacked;
 	char string[1024];
 	FILE *input;
 
-	printf("Loading input file...\n");
+	printf("Test_strcpy Loading input file...\n");
 
 	input = fopen("input", "r");
 	fread(string, sizeof(char), 1024, input);

@@ -59,7 +59,6 @@ namespace CS4277P1 {
                     continue;
                 }
             }
-
             if (isa<DbgInfoIntrinsic>(&I)) {
                 ++It;
                 continue;
@@ -73,34 +72,28 @@ namespace CS4277P1 {
 
     GlobalVariable* getOrCreateCanaryGuard(Module& M, IntegerType* CanaryTy,
         Align CanaryAlign) {
-        if (GlobalVariable* Existing =
-                M.getGlobalVariable("__cs4277_canary_guard", true))
+        if (GlobalVariable* Existing = M.getGlobalVariable("__cs4277_canary_guard", true))
             return Existing;
 
-        auto* Guard = new GlobalVariable(M, CanaryTy, false,
-            GlobalValue::InternalLinkage, ConstantInt::get(CanaryTy, 0),
-            "__cs4277_canary_guard");
+        auto* Guard = new GlobalVariable(M, CanaryTy, false, GlobalValue::InternalLinkage, ConstantInt::get(CanaryTy, 0), "__cs4277_canary_guard");
         Guard->setDSOLocal(true);
         Guard->setAlignment(CanaryAlign);
         return Guard;
     }
 
-    Function* createCanaryInitFunction(Module& M, GlobalVariable* CanaryGuard,
-        IntegerType* CanaryTy) {
+    Function* createCanaryInitFunction(Module& M, GlobalVariable* CanaryGuard, IntegerType* CanaryTy) {
         if (Function* Existing = M.getFunction("__cs4277_init_canary_guard"))
             return Existing;
 
         LLVMContext& CTX = M.getContext();
         FunctionType* InitTy = FunctionType::get(Type::getVoidTy(CTX), false);
-        Function* Init = Function::Create(InitTy, GlobalValue::InternalLinkage,
-            "__cs4277_init_canary_guard", M);
+        Function* Init = Function::Create(InitTy, GlobalValue::InternalLinkage, "__cs4277_init_canary_guard", M);
         Init->setDSOLocal(true);
 
         BasicBlock* Entry = BasicBlock::Create(CTX, "entry", Init);
         IRBuilder<> Builder(Entry);
 
-        Function* ReadCycle =
-            Intrinsic::getOrInsertDeclaration(&M, Intrinsic::readcyclecounter);
+        Function* ReadCycle = Intrinsic::getOrInsertDeclaration(&M, Intrinsic::readcyclecounter);
         Value* Guard = Builder.CreateCall(ReadCycle, {}, "canary.cycle");
 
         unsigned CanaryBits = CanaryTy->getBitWidth();
@@ -109,9 +102,7 @@ namespace CS4277P1 {
         else if (CanaryBits > 64)
             Guard = Builder.CreateZExt(Guard, CanaryTy, "canary.zext");
 
-        // Match the usual x64 canary convention: the low byte is zero.
-        Guard = Builder.CreateShl(
-            Guard, ConstantInt::get(CanaryTy, 8), "canary.zero.low.byte");
+        Guard = Builder.CreateShl(Guard, ConstantInt::get(CanaryTy, 8), "canary.zero.low.byte");
 
         StoreInst* GuardStore = Builder.CreateStore(Guard, CanaryGuard);
         GuardStore->setVolatile(true);
@@ -124,18 +115,14 @@ namespace CS4277P1 {
 
 bool InstrumentFunctions::runOnModule(Module& M) {
     bool Changed = false;
-
     LLVMContext& CTX = M.getContext();
     const DataLayout& DL = M.getDataLayout();
     IntegerType* Int32Ty = Type::getInt32Ty(CTX);
     IntegerType* CanaryTy = IntegerType::get(CTX, DL.getPointerSizeInBits());
     Align CanaryAlign = DL.getPointerABIAlignment(0);
     PointerType* PtrTy = PointerType::get(CTX, 0);
-    GlobalVariable* CanaryGuard =
-        CS4277P1::getOrCreateCanaryGuard(M, CanaryTy, CanaryAlign);
-    Function* CanaryInit =
-        CS4277P1::createCanaryInitFunction(M, CanaryGuard, CanaryTy);
-
+    GlobalVariable* CanaryGuard = CS4277P1::getOrCreateCanaryGuard(M, CanaryTy, CanaryAlign);
+    Function* CanaryInit = CS4277P1::createCanaryInitFunction(M, CanaryGuard, CanaryTy);
     FunctionType* PrintfTy = FunctionType::get(Int32Ty, { PtrTy }, true);
     FunctionCallee Printf = M.getOrInsertFunction("printf", PrintfTy);
 
@@ -143,6 +130,7 @@ bool InstrumentFunctions::runOnModule(Module& M) {
         PrintfF->setDoesNotThrow();
 
     Function* Trap = Intrinsic::getOrInsertDeclaration(&M, Intrinsic::trap);
+    Function* StackProtector = Intrinsic::getOrInsertDeclaration(&M, Intrinsic::stackprotector);
     GlobalVariable* CanaryFailFormat = CS4277P1::getOrCreateStringGlobal(
         M, "__cs4277_canary_fail_format",
         "Stack canary corrupted before leaving %s\n");
@@ -152,21 +140,19 @@ bool InstrumentFunctions::runOnModule(Module& M) {
             continue;
         if (&F == CanaryInit)
             continue;
-
         std::string CanaryName = "__cs4277_canary_" + F.getName().str();
 
         IRBuilder<> EntryBuilder(CS4277P1::getCanaryAllocaInsertBefore(F));
-        AllocaInst* CanarySlot =
-            EntryBuilder.CreateAlloca(CanaryTy, nullptr, CanaryName);
+        AllocaInst* CanarySlot = EntryBuilder.CreateAlloca(CanaryTy, nullptr, CanaryName);
         CanarySlot->setAlignment(CanaryAlign);
-        LoadInst* EntryGuard =
-            EntryBuilder.CreateLoad(CanaryTy, CanaryGuard, "canary.guard");
+        LoadInst* EntryGuard = EntryBuilder.CreateLoad(CanaryTy, CanaryGuard, "canary.guard");
         EntryGuard->setVolatile(true);
         StoreInst* CanaryStore = EntryBuilder.CreateStore(EntryGuard, CanarySlot);
         CanaryStore->setVolatile(true);
+        Value* EntryGuardPtr = EntryBuilder.CreateIntToPtr(EntryGuard, PtrTy, "canary.guard.ptr");
+        EntryBuilder.CreateCall(StackProtector, { EntryGuardPtr, CanarySlot });
 
-        GlobalVariable* FunctionNameGlobal = EntryBuilder.CreateGlobalString(
-            F.getName(), Twine(F.getName()) + ".name");
+        GlobalVariable* FunctionNameGlobal = EntryBuilder.CreateGlobalString(F.getName(), Twine(F.getName()) + ".name");
         Value* FunctionName = CS4277P1::createGlobalStringPtr(EntryBuilder, FunctionNameGlobal, "function.name");
 
         std::vector<Instruction*> Terminators;
@@ -178,20 +164,15 @@ bool InstrumentFunctions::runOnModule(Module& M) {
         for (auto* Term : Terminators) {
             if (!Term->getParent() || Term->getParent()->getParent() != &F)
                 continue;
-
             IRBuilder<> CheckBuilder(Term);
-            LoadInst* LoadedCanary =
-                CheckBuilder.CreateLoad(CanaryTy, CanarySlot, "canary.load");
+            LoadInst* LoadedCanary = CheckBuilder.CreateLoad(CanaryTy, CanarySlot, "canary.load");
             LoadedCanary->setVolatile(true);
-            LoadInst* ExpectedCanary =
-                CheckBuilder.CreateLoad(CanaryTy, CanaryGuard, "canary.expected");
+            LoadInst* ExpectedCanary = CheckBuilder.CreateLoad(CanaryTy, CanaryGuard, "canary.expected");
             ExpectedCanary->setVolatile(true);
 
-            Value* CanaryIsCorrupt = CheckBuilder.CreateICmpNE(
-                LoadedCanary, ExpectedCanary, "canary.corrupt");
+            Value* CanaryIsCorrupt = CheckBuilder.CreateICmpNE(LoadedCanary, ExpectedCanary, "canary.corrupt");
 
-            Instruction* FailTerm =
-                SplitBlockAndInsertIfThen(CanaryIsCorrupt, Term, true);
+            Instruction* FailTerm = SplitBlockAndInsertIfThen(CanaryIsCorrupt, Term, true);
             IRBuilder<> FailBuilder(FailTerm);
 
             Value* FormatPtr = CS4277P1::createGlobalStringPtr(FailBuilder, CanaryFailFormat, "canary.fail.format");
