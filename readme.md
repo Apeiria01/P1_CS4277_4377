@@ -1,11 +1,29 @@
 Team member: Yean Luo
 
-# Implementing Stack Canaries in an LLVM IR Pass for Windows x64
+# Project 2 Implementing Stack Canaries in an LLVM IR Pass for Windows x64
 
 ## Implementation Setting
 System: Windows x64
 LLVM: LLVM release package at [https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.4/clang+llvm-22.1.4-x86_64-pc-windows-msvc.tar.xz](https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.4/clang+llvm-22.1.4-x86_64-pc-windows-msvc.tar.xz) for compiling subjects.
-C/C++ compiler: MSVC vc 146 with Visual Studio 2026 for compiling IR pass plugin.
+C/C++ compiler: MSVC vc 145 with Visual Studio 2026 for compiling IR pass plugin.
+
+# Deliverable
+- IR Pass plugin in `./pass`, with binary at Release section.
+- Test Scripts. Run `python make_input_[xx].py` to generate malicious stack overflow input and then run `python run_test.py Test_[Test Name]` to build and run tests.
+- Report: here.
+- Presentation Video: [https://youtu.be/ZMzHj2VqHiQ](https://youtu.be/ZMzHj2VqHiQ)
+
+## Build Instructions
+Run `cmake -B build -G "Visual Studio 18 2026" ` in "pass" directory to generate VS solution file to compile IR Pass (`InstrumentFunctions.dll`).
+For tests, run `python run_test.py Test_[Test Name]` to build and run tests. It would compile the Test associated and generate `Test_[Test Name]2.exe` as a instrumented version and `Test_[Test Name].exe` not protected.
+For running IR pass in command line, run:
+```powershell
+.\make-llvm-ir.ps1 .\TestPrintCanary.cpp TestPrintCanary.ll
+.\plug.ps1 .\TestPrintCanary.ll .\TestPrintCanary2.ll
+D:\llvm-project\b\RelWithDebInfo\bin\llc.exe -mtriple=x86_64-pc-windows-msvc ./TestPrintCanary2.ll
+.\compile.ps1 .\TestPrintCanary2.s ./TestPrintCanary2.exe
+```
+While there are some hard coded path, change `D:\llvm-project\b\RelWithDebInfo\bin\llc.exe` to your `llc` path in your LLVM installation. For `make-llvm-ir.ps1`, `plug.ps1` and `compile.ps1`, change the `$llvmRoot` literal to your LLVM installation path. Before running plug, change `$Plugin` to the path to `InstrumentFunctions.dll`.
 
 ## Project Summary
 
